@@ -22,6 +22,7 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var count = 0;
 
     private lateinit var brushShader: ShaderProgram
+    private lateinit var Shader: ShaderProgram
     private lateinit var fgShader: ShaderProgram
     private lateinit var bgShader: ShaderProgram
 
@@ -43,16 +44,14 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var brushPointsHandle = 0
     private var brushThicknessHandle = 0
     private var brushResolutionHandle = 0
-
-    private var fgPosHandle = 0
-    private var fgTexHandle = 0
     private var fgMaskHandle = 0
-
-    private var bgPosHandle = 0
+    private var displayHandle = 0
     private var bgTexHandle = 0
-
+    private var fgTexHandle = 0
     private var bgTextureId = 0
     private var fgTextureId = 0
+
+    private var mode = 0
 
     private var pointA = floatArrayOf(-2f, -2f)
     private var pointB = floatArrayOf(-2f, -2f)
@@ -65,27 +64,22 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
         glClearColor(1f, 1f, 1f, 1f)
 
-        brushShader = ShaderProgram(context, R.raw.vertex_shader, R.raw.fragment_shader)
-        fgShader = ShaderProgram(context, R.raw.vertex_shader, R.raw.foreground_fragment)
-        bgShader = ShaderProgram(context, R.raw.vertex_shader, R.raw.texture_fragment_shader)
+        Shader = ShaderProgram(context, R.raw.vertex_shader, R.raw.fragment_shader)
 
-        brushShader.useProgram()
-        brushPosHandle = glGetAttribLocation(brushShader.program, "a_Position")
-        brushPointsHandle = glGetUniformLocation(brushShader.program, "u_Points")
-        brushThicknessHandle = glGetUniformLocation(brushShader.program, "u_Thickness")
-        brushResolutionHandle = glGetUniformLocation(brushShader.program, "u_resolution")
-
-        fgShader.useProgram()
-        fgPosHandle = glGetAttribLocation(fgShader.program, "a_Position")
-        fgTexHandle = glGetUniformLocation(fgShader.program, "u_Foreground")
-        fgMaskHandle = glGetUniformLocation(fgShader.program, "u_Mask")
-
-        bgShader.useProgram()
-        bgPosHandle = glGetAttribLocation(bgShader.program, "a_Position")
-        bgTexHandle = glGetUniformLocation(bgShader.program, "u_Texture")
+        Shader.useProgram()
+        brushPosHandle = glGetAttribLocation(Shader.program, "a_Position")
+        brushPointsHandle = glGetUniformLocation(Shader.program, "u_Points")
+        brushThicknessHandle = glGetUniformLocation(Shader.program, "u_Thickness")
+        brushResolutionHandle = glGetUniformLocation(Shader.program, "u_resolution")
+        fgMaskHandle = glGetUniformLocation(Shader.program, "u_Mask")
+        bgTexHandle = glGetUniformLocation(Shader.program, "u_Texture")
+        fgTexHandle = glGetUniformLocation(Shader.program, "u_Forest")
+        mode = glGetUniformLocation(Shader.program, "u_Mode")
+        displayHandle = glGetUniformLocation(Shader.program, "u_Display")
 
         bgTextureId = loadTextureFromRes(R.drawable.background)
         fgTextureId = loadTextureFromRes(R.drawable.foreground)
+
     }
 
     override fun onSurfaceChanged(unused: GL10?, width: Int, height: Int) {
@@ -99,6 +93,7 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun setupFBO(width: Int, height: Int) {
+
         glGenFramebuffers(1, fboId, 0)
         glGenTextures(1, fboTextureId, 0)
 
@@ -111,10 +106,11 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         glBindFramebuffer(GL_FRAMEBUFFER, fboId[0])
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTextureId[0], 0)
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f)
-        glClear(GL_COLOR_BUFFER_BIT)
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
     }
+
 
     override fun onDrawFrame(unused: GL10?) {
 
@@ -122,44 +118,42 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        brushShader.useProgram()
+        Shader.useProgram()
         vertexBuffer.position(0)
         glEnableVertexAttribArray(brushPosHandle)
         glVertexAttribPointer(brushPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
-
         glUniform2fv(brushPointsHandle, 2, floatArrayOf(pointA[0], pointA[1], pointB[0], pointB[1]), 0)
         glUniform1f(brushThicknessHandle, 100f)
         glUniform2f(brushResolutionHandle, screenWidth.toFloat(), screenHeight.toFloat())
-
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-        glDisableVertexAttribArray(brushPosHandle)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        bgShader.useProgram()
-        vertexBuffer.position(0)
-        glEnableVertexAttribArray(bgPosHandle)
-        glVertexAttribPointer(bgPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, bgTextureId)
         glUniform1i(bgTexHandle, 0)
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-        glDisableVertexAttribArray(bgPosHandle)
-
-        fgShader.useProgram()
-        vertexBuffer.position(0)
-        glEnableVertexAttribArray(fgPosHandle)
-        glVertexAttribPointer(fgPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
-
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, fgTextureId)
-        glUniform1i(fgTexHandle, 0)
-
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, fboTextureId[0])
         glUniform1i(fgMaskHandle, 1)
-
+        glUniform1i(displayHandle, 0)
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-        glDisableVertexAttribArray(fgPosHandle)
+        glDisableVertexAttribArray(brushPosHandle)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        Shader.useProgram()
+        vertexBuffer.position(0)
+        glEnableVertexAttribArray(brushPosHandle)
+        glVertexAttribPointer(brushPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, fboTextureId[0])
+        glUniform1i(fgMaskHandle, 0)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, fgTextureId)
+        glUniform1i(fgTexHandle, 1)
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, bgTextureId)
+        glUniform1i(bgTexHandle, 2)
+        glUniform1i(displayHandle, 1)
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        glDisableVertexAttribArray(brushPosHandle)
+
         glDisable(GL_BLEND)
     }
 

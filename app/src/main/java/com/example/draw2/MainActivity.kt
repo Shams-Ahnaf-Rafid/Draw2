@@ -50,17 +50,17 @@ fun DrawingScreen() {
                 .weight(1f)
         )
 
-//        Column(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(16.dp),
-//            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
-//        ) {
-//            Button(onClick = {
-////                myGLSurfaceView.clear()
-//            }) {
-//                Text("Undo")
-//            }
-//        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        ) {
+            Button(onClick = {
+//                myGLSurfaceView.clear()
+            }) {
+                Text("Undo")
+            }
+        }
     }
 }
