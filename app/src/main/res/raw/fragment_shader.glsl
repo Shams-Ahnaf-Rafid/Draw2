@@ -4,7 +4,6 @@ uniform vec4 u_Color;
 uniform float u_Thickness;
 uniform vec2 u_Points[2];
 uniform vec2 u_resolution;
-uniform sampler2D u_Texture;
 
 varying vec2 v_TexCoord;
 
@@ -25,11 +24,7 @@ void main() {
 
     float dist = length(fragPos - closest);
 
-    vec4 prev = texture2D(u_Texture, v_TexCoord);
-
     if(dist <= u_Thickness * 0.5) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);  // black = erase
-    } else {
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);  // white = keep foreground
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     }
 }
