@@ -15,9 +15,7 @@ void main() {
 
     if (u_Display) {
         float a = texture2D(u_Mask, v_TexCoord).r;
-        if (a == 1.0) {
-            gl_FragColor = texture2D(u_Texture, v_TexCoord);
-        }
+        if (a == 1.0) gl_FragColor = texture2D(u_Texture, v_TexCoord);
         else gl_FragColor = texture2D(u_Forest, v_TexCoord);
     }
     else {
@@ -37,11 +35,7 @@ void main() {
 
         float dist = length(fragPos - closest);
 
-        if (dist <= u_Thickness * 0.5) {
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        }
-        else {
-            gl_FragColor = texture2D(u_Mask, v_TexCoord);
-        }
+        if (dist <= u_Thickness * 0.5) gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        else gl_FragColor = texture2D(u_Mask, v_TexCoord);
     }
 }

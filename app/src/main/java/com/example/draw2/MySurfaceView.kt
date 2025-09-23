@@ -23,15 +23,18 @@ class MyGLSurfaceView(context: Context) : GLSurfaceView(context) {
         val x = event.x
         val y = event.y
 
-//        Log.d("Check", "x: $x , y: $y")
-
         val normX = (x / width) * 2f - 1f
         val normY = -((y / height) * 2f - 1f)
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                queueEvent {
+                    renderer.save()
+                }
                 lastX = normX
                 lastY = normY
+                renderer.setPoints(normX, normY, normX, normY)
+                requestRender()
             }
             MotionEvent.ACTION_MOVE -> {
                 renderer.setPoints(lastX, lastY, normX, normY)
@@ -40,7 +43,15 @@ class MyGLSurfaceView(context: Context) : GLSurfaceView(context) {
                 requestRender()
             }
         }
+
         return true
+    }
+
+    fun undo() {
+        queueEvent {
+            renderer.undo()
+        }
+        requestRender()
     }
 
 }

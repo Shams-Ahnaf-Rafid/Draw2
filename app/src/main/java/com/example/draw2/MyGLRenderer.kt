@@ -20,11 +20,10 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var screenWidth = 1
     private var screenHeight = 1
     var count = 0;
-
-    private lateinit var brushShader: ShaderProgram
+    private val maxUndoStates = 20
+    private val undoStack: ArrayDeque<Int> = ArrayDeque()
     private lateinit var Shader: ShaderProgram
-    private lateinit var fgShader: ShaderProgram
-    private lateinit var bgShader: ShaderProgram
+    private var touch = false
 
     private val quadVertices = floatArrayOf(
         1f, 1f,
@@ -51,14 +50,13 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var bgTextureId = 0
     private var fgTextureId = 0
 
-    private var mode = 0
-
     private var pointA = floatArrayOf(-2f, -2f)
     private var pointB = floatArrayOf(-2f, -2f)
 
     fun setPoints(x0: Float, y0: Float, x1: Float, y1: Float) {
         pointA[0] = x0; pointA[1] = y0
         pointB[0] = x1; pointB[1] = y1
+        touch = true
     }
 
     override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
@@ -74,7 +72,6 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
         fgMaskHandle = glGetUniformLocation(Shader.program, "u_Mask")
         bgTexHandle = glGetUniformLocation(Shader.program, "u_Texture")
         fgTexHandle = glGetUniformLocation(Shader.program, "u_Forest")
-        mode = glGetUniformLocation(Shader.program, "u_Mode")
         displayHandle = glGetUniformLocation(Shader.program, "u_Display")
 
         bgTextureId = loadTextureFromRes(R.drawable.background)
@@ -90,6 +87,7 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
             setupFBO(width, height)
             count++;
         }
+        save()
     }
 
     private fun setupFBO(width: Int, height: Int) {
@@ -111,29 +109,34 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     }
 
-
     override fun onDrawFrame(unused: GL10?) {
 
         glBindFramebuffer(GL_FRAMEBUFFER, fboId[0])
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        Shader.useProgram()
-        vertexBuffer.position(0)
-        glEnableVertexAttribArray(brushPosHandle)
-        glVertexAttribPointer(brushPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
-        glUniform2fv(brushPointsHandle, 2, floatArrayOf(pointA[0], pointA[1], pointB[0], pointB[1]), 0)
-        glUniform1f(brushThicknessHandle, 100f)
-        glUniform2f(brushResolutionHandle, screenWidth.toFloat(), screenHeight.toFloat())
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, bgTextureId)
-        glUniform1i(bgTexHandle, 0)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, fboTextureId[0])
-        glUniform1i(fgMaskHandle, 1)
-        glUniform1i(displayHandle, 0)
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
-        glDisableVertexAttribArray(brushPosHandle)
+
+        if (touch) {
+
+            Shader.useProgram()
+            vertexBuffer.position(0)
+            glEnableVertexAttribArray(brushPosHandle)
+            glVertexAttribPointer(brushPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
+            glUniform2fv(brushPointsHandle, 2, floatArrayOf(pointA[0], pointA[1], pointB[0], pointB[1]), 0)
+            glUniform1f(brushThicknessHandle, 100f)
+            glUniform2f(brushResolutionHandle, screenWidth.toFloat(), screenHeight.toFloat())
+            glActiveTexture(GL_TEXTURE0)
+            glBindTexture(GL_TEXTURE_2D, bgTextureId)
+            glUniform1i(bgTexHandle, 0)
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, fboTextureId[0])
+            glUniform1i(fgMaskHandle, 1)
+            glUniform1i(displayHandle, 0)
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+            glDisableVertexAttribArray(brushPosHandle)
+
+            touch = false
+        }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
@@ -174,4 +177,48 @@ class MyGLRenderer(private val context: Context) : GLSurfaceView.Renderer {
         flipped.recycle()
         return textures[0]
     }
+
+    fun save() {
+
+        val texId = IntArray(1)
+        glGenTextures(1, texId, 0)
+        glBindTexture(GL_TEXTURE_2D, texId[0])
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, screenWidth, screenHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, null)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fboId[0])
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, screenWidth, screenHeight)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        undoStack.addLast(texId[0])
+
+        if (undoStack.size > maxUndoStates) undoStack.removeFirst()
+    }
+
+    fun undo() {
+        if (undoStack.isEmpty()) return
+
+        val lastTex = undoStack.removeLast()
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fboId[0])
+        glViewport(0, 0, screenWidth, screenHeight)
+
+        Shader.useProgram()
+        vertexBuffer.position(0)
+        glEnableVertexAttribArray(brushPosHandle)
+        glVertexAttribPointer(brushPosHandle, 2, GL_FLOAT, false, 8, vertexBuffer)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, lastTex)
+        glUniform1i(bgTexHandle, 0)
+        glUniform1i(displayHandle, 1)
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        glDisableVertexAttribArray(brushPosHandle)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    }
+
 }

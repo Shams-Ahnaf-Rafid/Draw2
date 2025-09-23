@@ -57,7 +57,7 @@ fun DrawingScreen() {
             horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
         ) {
             Button(onClick = {
-//                myGLSurfaceView.clear()
+                myGLSurfaceView.undo()
             }) {
                 Text("Undo")
             }
